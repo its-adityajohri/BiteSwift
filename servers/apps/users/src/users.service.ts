@@ -43,7 +43,20 @@ export class UsersService {
   }
 
   async getUsers() {
-    const users = [];
+    const users = [
+      {
+        id: 1,
+        name: 'test',
+        email: 'abc@xyz.com',
+        password: 'testPassword1',
+      },
+      {
+        id: 2,
+        name: 'test2',
+        email: 'def@xyz.com',
+        password: 'testPassword2',
+      },
+    ];
     return users;
   }
 }
