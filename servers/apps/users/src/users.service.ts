@@ -1,32 +1,53 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { RegisterDto } from './DTOs/user.dto';
 import { Response } from 'express';
+import { PrismaService } from '../../../prisma/prisma.service';
 
 @Injectable()
 export class UsersService {
   constructor(
     private readonly configService: ConfigService,
-    //private readonly prisma;
+    private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
   ) {}
 
   async register(registerDto: RegisterDto, response: Response) {
-    // const user = await this.prisma.user.create({
-    //   data: {
-    //     name: registerDto.name,
-    //     email: registerDto.email,
-    //     password: registerDto.password,
-    //   },
-    // });
-    const user = {
-      name: registerDto.name,
-      email: registerDto.email,
-      password: registerDto.password,
-    };
-    return user;
+    const emailExists = await this.prisma.user.findUnique({
+      where: {
+        email: registerDto.email,
+      },
+    });
+    if (emailExists) {
+      throw new BadRequestException('User with this Email already exists!');
+    }
+    const phoneNumbersToCheck = [registerDto.phone_number];
+
+    const usersWithPhoneNumber = await this.prisma.user.findMany({
+      where: {
+        phone_number: {
+          not: null,
+          in: phoneNumbersToCheck,
+        },
+      },
+    });
+
+    if (usersWithPhoneNumber.length > 0) {
+      throw new BadRequestException(
+        'User already exist with this phone number!',
+      );
+    }
+    const user = await this.prisma.user.create({
+      data: {
+        name: registerDto.name,
+        email: registerDto.email,
+        password: registerDto.password,
+        phone_number: registerDto.phone_number,
+      },
+    });
+    return { user, response };
   }
 
   async login(registerDto: RegisterDto, response: Response) {
@@ -43,20 +64,6 @@ export class UsersService {
   }
 
   async getUsers() {
-    const users = [
-      {
-        id: 1,
-        name: 'test',
-        email: 'abc@xyz.com',
-        password: 'testPassword1',
-      },
-      {
-        id: 2,
-        name: 'test2',
-        email: 'def@xyz.com',
-        password: 'testPassword2',
-      },
-    ];
-    return users;
+    return this.prisma.user.findMany({});
   }
 }
