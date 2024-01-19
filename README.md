@@ -1,1 +1,3 @@
 A MicroServices Architecture based Food Delivery Service Web Application using Nestjs as backend framework and Nextjs for frontend.
+
+In light of the Microservice Architecture, specifying the exact technologies we intend to utilize poses a challenge. Nevertheless, for a general outline, our plan includes leveraging Nest.js as the backend framework, employing GraphQL as the Microservice connection gateway, adopting Docker for containerizing our application, utilizing Prisma as the Database ORM, and deploying with AWS ECS, in conjunction with other AWS platforms. On the frontend, Next.js will be employed to enhance speed and ensure superior SEO. 
