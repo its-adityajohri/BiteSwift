@@ -5,6 +5,7 @@ import { JwtService } from '@nestjs/jwt';
 import { RegisterDto } from './DTOs/user.dto';
 import { Response } from 'express';
 import { PrismaService } from '../../../prisma/prisma.service';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
@@ -15,22 +16,19 @@ export class UsersService {
   ) {}
 
   async register(registerDto: RegisterDto, response: Response) {
+    const { name, email, password, phone_number } = registerDto;
     const emailExists = await this.prisma.user.findUnique({
       where: {
-        email: registerDto.email,
+        email,
       },
     });
     if (emailExists) {
       throw new BadRequestException('User with this Email already exists!');
     }
-    const phoneNumbersToCheck = [registerDto.phone_number];
 
     const usersWithPhoneNumber = await this.prisma.user.findMany({
       where: {
-        phone_number: {
-          not: null,
-          in: phoneNumbersToCheck,
-        },
+        phone_number,
       },
     });
 
@@ -39,12 +37,15 @@ export class UsersService {
         'User already exist with this phone number!',
       );
     }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
     const user = await this.prisma.user.create({
       data: {
-        name: registerDto.name,
-        email: registerDto.email,
-        password: registerDto.password,
-        phone_number: registerDto.phone_number,
+        name,
+        email,
+        password: hashedPassword,
+        phone_number,
       },
     });
     return { user, response };
