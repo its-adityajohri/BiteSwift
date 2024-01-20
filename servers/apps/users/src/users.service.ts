@@ -1,10 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
-import { RegisterDto } from './DTOs/user.dto';
+import { JwtService, JwtVerifyOptions } from '@nestjs/jwt';
+import { RegisterDto, LoginDto, ActivationDto } from './DTOs/user.dto';
 import { Response } from 'express';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { TokenSender } from './utils/sendToken';
 import * as bcrypt from 'bcrypt';
 
 interface UserData {
@@ -73,17 +74,74 @@ export class UsersService {
     );
     return { token, activationCode };
   }
-  async login(registerDto: RegisterDto, response: Response) {
-    // const user = await this.prisma.user.findUnique({
-    //   where: {
-    //     email: registerDto.email,
-    //   },
-    // });
-    const user = {
-      email: registerDto.email,
-      password: registerDto.password,
-    };
-    return user;
+
+  // activation user
+  async activateUser(activationDto: ActivationDto, response: Response) {
+    const { activationToken, activationCode } = activationDto;
+
+    const newUser: { user: UserData; activationCode: string } =
+      this.jwtService.verify(activationToken, {
+        secret: this.configService.get<string>('ACTIVATION_SECRET'),
+      } as JwtVerifyOptions) as { user: UserData; activationCode: string };
+
+    if (newUser.activationCode !== activationCode) {
+      throw new BadRequestException('Invalid activation code');
+    }
+
+    const { name, email, password, phone_number } = newUser.user;
+
+    const existUser = await this.prisma.user.findUnique({
+      where: {
+        email,
+      },
+    });
+
+    if (existUser) {
+      throw new BadRequestException('User already exist with this email!');
+    }
+
+    const user = await this.prisma.user.create({
+      data: {
+        name,
+        email,
+        password,
+        phone_number,
+      },
+    });
+
+    return { user, response };
+  }
+
+  // Login service
+  async Login(loginDto: LoginDto) {
+    const { email, password } = loginDto;
+    const user = await this.prisma.user.findUnique({
+      where: {
+        email,
+      },
+    });
+
+    if (user && (await this.comparePassword(password, user.password))) {
+      const tokenSender = new TokenSender(this.configService, this.jwtService);
+      return tokenSender.sendToken(user);
+    } else {
+      return {
+        user: null,
+        accessToken: null,
+        refreshToken: null,
+        error: {
+          message: 'Invalid email or password',
+        },
+      };
+    }
+  }
+
+  // compare with hashed password
+  async comparePassword(
+    password: string,
+    hashedPassword: string,
+  ): Promise<boolean> {
+    return await bcrypt.compare(password, hashedPassword);
   }
 
   async getUsers() {
